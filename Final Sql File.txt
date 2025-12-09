@@ -1,0 +1,242 @@
+-- ------------------------------------------
+-- Aggregate Functions, Join, Concatenation, Distinct Clause
+-- ------------------------------------------
+
+-- ------------------------------------------
+-- Select Statement with Aggregate Functions:
+-- ------------------------------------------
+
+-- Total students and average grade in each department
+SELECT 
+    rd.department_name AS "Department",
+    COUNT(rs.student_id) AS "Total Students",
+    AVG(CAST(re.grade AS SIGNED)) AS "Average Grade"
+FROM 
+    registration_enrollment re
+JOIN 
+    registration_course rc ON re.course_id = rc.course_id
+JOIN 
+    registration_department rd ON rc.department_id = rd.department_id
+JOIN 
+    registration_student rs ON re.student_id = rs.student_id
+GROUP BY 
+    rd.department_name
+ORDER BY 
+    "Total Students" DESC;
+
+-- ------------------------------------------
+-- Select Statement with Join, Concatenation, and Distinct:
+-- ------------------------------------------
+
+-- List of distinct courses with their teacher's full name
+SELECT DISTINCT 
+    CONCAT(rt.teacher_fname, ' ', rt.teacher_lname) AS "Teacher Name",
+    rc.course_name AS "Course"
+FROM 
+    registration_course rc
+JOIN 
+    registration_teacher rt ON rc.teacher_id = rt.teacher_id
+ORDER BY 
+    "Teacher Name" ASC;
+
+-- ------------------------------------------
+-- Subquery, Order By Clause
+-- ------------------------------------------
+
+-- ------------------------------------------
+-- Select Statement with Subquery:
+-- ------------------------------------------
+	
+-- Find students enrolled in the most popular course
+SELECT 
+    rs.student_fname AS "First Name",
+    rs.student_lname AS "Last Name",
+    rc.course_name AS "Course Name"
+FROM 
+    registration_student rs
+JOIN 
+    registration_enrollment re ON rs.student_id = re.student_id
+JOIN 
+    registration_course rc ON re.course_id = rc.course_id
+WHERE 
+    rc.course_id = (SELECT re.course_id 
+                    FROM registration_enrollment re
+                    GROUP BY re.course_id
+                    ORDER BY COUNT(re.student_id) DESC
+                    LIMIT 1);
+
+-- ------------------------------------------
+-- Select Statement with Order By Clause:
+-- ------------------------------------------
+
+-- Students ordered by year of study and last name
+SELECT 
+    rs.student_id AS "ID",
+    rs.student_fname AS "First Name",
+    rs.student_lname AS "Last Name",
+    rs.year_of_study AS "Year"
+FROM 
+    registration_student rs
+ORDER BY 
+    rs.year_of_study DESC, rs.student_lname ASC;
+
+-- ------------------------------------------
+-- Triggers and Two Custom Queries
+-- ------------------------------------------
+
+-- ------------------------------------------
+-- Insert Statement with Trigger
+-- ------------------------------------------
+
+-- Trigger: Update registration_course capacity when a student is enrolled.:
+	
+delimiter |
+	CREATE TRIGGER update_capacity
+AFTER INSERT ON registration_enrollment
+FOR EACH ROW
+BEGIN
+    UPDATE registration_course
+    SET capacity = capacity - 1
+    WHERE course_id = NEW.course_id;
+END;
+|
+delimiter ;
+
+-- Insert Statement to Test Trigger:
+	
+INSERT INTO registration_enrollment (enrollment_date, grade, status, course_id, student_id)
+VALUES ('2024-11-19', NULL, 'Enrolled', 50, 94);
+
+-- ------------------------------------------
+-- Delete Statement with Trigger
+-- ------------------------------------------
+
+-- Trigger: Remove student records from enrollment if deleted from registration_student.:
+	
+delimiter |
+	CREATE TRIGGER delete_enrollment
+BEFORE DELETE ON registration_student
+FOR EACH ROW
+BEGIN
+    DELETE FROM registration_enrollment WHERE student_id = OLD.student_id;
+END;
+|
+delimiter ;
+
+
+-- Delete Statement to Test Trigger:
+
+DELETE FROM registration_student WHERE student_id = 94;
+
+-- ------------------------------------------
+-- Anthony Sparks Query 1:
+-- ------------------------------------------
+
+-- Enrollment details showing student, course, teacher, and department
+SELECT 
+    CONCAT(rs.student_fname, ' ', rs.student_lname) AS "Student Name",
+    rc.course_name AS "Course Name",
+    rd.department_name AS "Department",
+    CONCAT(rt.teacher_fname, ' ', rt.teacher_lname) AS "Teacher Name",
+    re.enrollment_date AS "Enrollment Date",
+    IF(re.grade IS NULL, 'Not Graded', re.grade) AS "Grade"
+FROM 
+    registration_enrollment re
+JOIN 
+    registration_course rc ON re.course_id = rc.course_id
+JOIN 
+    registration_student rs ON re.student_id = rs.student_id
+LEFT JOIN 
+    registration_teacher rt ON rc.teacher_id = rt.teacher_id
+JOIN 
+    registration_department rd ON rc.department_id = rd.department_id
+ORDER BY 
+    re.enrollment_date DESC, rs.student_fname ASC;
+
+-- ------------------------------------------
+-- Anthony Sparks Query 2:
+-- ------------------------------------------
+
+-- Teachers and the number of courses they teach, showing department and total capacity
+SELECT 
+    CONCAT(rt.teacher_fname, ' ', rt.teacher_lname) AS "Teacher Name",
+    rd.department_name AS "Department",
+    COUNT(rc.course_id) AS "Courses Taught",
+    SUM(rc.capacity) AS "Total Capacity"
+FROM 
+    registration_teacher rt
+JOIN 
+    registration_course rc ON rt.teacher_id = rc.teacher_id
+JOIN 
+    registration_department rd ON rc.department_id = rd.department_id
+GROUP BY 
+    rt.teacher_id, rd.department_name
+ORDER BY 
+    "Courses Taught" DESC, "Total Capacity" DESC, rt.teacher_fname ASC;
+
+-- ------------------------------------------
+-- Brian Statom Query 1:
+-- ------------------------------------------
+
+-- get the faculty heads of each department and their office locations
+SELECT
+    rt.teacher_id as "Teacher ID",
+    rt.teacher_fname as "First Name",
+    rt.teacher_lname as "Last Name",
+    rt.office_location as "Office",
+    rd.department_name as "Department"
+FROM
+    registration_teacher rt
+JOIN
+    registration_department rd ON rt.teacher_id = rd.faculty_head_id
+ORDER BY
+    rt.teacher_id;
+
+-- ------------------------------------------
+-- Brian Statom Query 2:
+-- ------------------------------------------
+
+-- get all the students in their fourth year
+SELECT
+    rs.student_id as "Student ID",
+    rs.student_fname as "First Name",
+    rs.student_lname as "Last Name",
+    rs.year_of_study as "Year"
+FROM
+    registration_student rs
+WHERE
+    rs.year_of_study = 4
+ORDER BY
+    rs.student_lname ASC, rs.student_fname ASC;
+
+-- ------------------------------------------
+-- Azaan Sundrani Query 1:
+-- ------------------------------------------
+
+-- get all majors in students, and list from most popular to least popular
+SELECT
+    rs.Major as "Major",
+    COUNT(rs.Major) as "Students in Major"
+FROM
+    registration_student rs
+GROUP BY
+	rs.major
+ORDER BY
+    COUNT(*) DESC;
+
+-- ------------------------------------------
+-- Azaan Sundrani Query 2:
+-- ------------------------------------------
+
+-- get the number of teachers in a department
+SELECT
+    rd.department_name as "Department Name",
+    COUNT(rs.department_id) as "Number of Staff"
+FROM
+    registration_department rd
+JOIN
+    registration_teacher rs ON rd.department_id = rs.department_id
+GROUP BY
+    rd.department_name
+ORDER BY
+    COUNT(*) DESC;
